@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 .cache
-chrome-profile
 
 # Build output
 dist/
