@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer-extra');
 const stealth = require('puppeteer-extra-plugin-stealth')();
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 puppeteer.use(stealth);
 
 async function clickButtonsByText(page, texts = []) {
@@ -108,9 +109,8 @@ async function scrapeTikTokStats(username, opts = {}) {
   const defaultHeadless = headlessEnv === '0' ? false : 'new';
   const headlessOpt = typeof opts.headless !== 'undefined' ? opts.headless : defaultHeadless;
 
-  // Use a writable temp directory for Chromium user data (some platforms mount app dir as read-only)
-  const userDataDir = path.join(os.tmpdir(), 'puppeteer-profile');
-  try { require('fs').mkdirSync(userDataDir, { recursive: true }); } catch (_) {}
+  // Use a unique writable temp directory for Chromium user data to avoid SingletonLock conflicts
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'puppeteer-profile-'));
 
   const launchOptions = {
     headless: headlessOpt,
@@ -122,8 +122,7 @@ async function scrapeTikTokStats(username, opts = {}) {
       '--disable-blink-features=AutomationControlled',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--no-zygote',
-      '--single-process'
+      '--no-zygote'
     ]
   };
 
@@ -233,6 +232,8 @@ async function scrapeTikTokStats(username, opts = {}) {
     return output;
   } finally {
     try { await browser.close(); } catch (_) {}
+    // Clean up temp Chromium profile to avoid stale SingletonLock files
+    try { fs.rmSync(userDataDir, { recursive: true, force: true }); } catch (_) {}
   }
 }
 
