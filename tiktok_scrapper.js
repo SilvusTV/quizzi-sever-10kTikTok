@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-extra');
 const stealth = require('puppeteer-extra-plugin-stealth')();
 const path = require('path');
+const os = require('os');
 puppeteer.use(stealth);
 
 async function clickButtonsByText(page, texts = []) {
@@ -99,17 +100,34 @@ function getProfileStatsFromSIGI(username, sigiState) {
 }
 
 async function scrapeTikTokStats(username, opts = {}) {
-  const headlessEnv = process.env.HEADLESS === '1' || process.env.HEADLESS === 'true';
-  const headlessOpt = typeof opts.headless !== 'undefined' ? opts.headless : (headlessEnv ? 'new' : false);
-  const browser = await puppeteer.launch({
+  // Resolve headless mode (default to headless on servers):
+  // - HEADLESS=0 => non-headless (for local debug with a display)
+  // - HEADLESS=1/true => headless 'new'
+  // - unset => headless 'new'
+  const headlessEnv = (process.env.HEADLESS || '').toLowerCase();
+  const defaultHeadless = headlessEnv === '0' ? false : 'new';
+  const headlessOpt = typeof opts.headless !== 'undefined' ? opts.headless : defaultHeadless;
+
+  // Use a writable temp directory for Chromium user data (some platforms mount app dir as read-only)
+  const userDataDir = path.join(os.tmpdir(), 'puppeteer-profile');
+  try { require('fs').mkdirSync(userDataDir, { recursive: true }); } catch (_) {}
+
+  const launchOptions = {
     headless: headlessOpt,
-    userDataDir: path.join(__dirname, 'chrome-profile'),
+    userDataDir,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-blink-features=AutomationControlled'
+      '--disable-blink-features=AutomationControlled',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-zygote',
+      '--single-process'
     ]
-  });
+  };
+
+  const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
 
   // UA Desktop pour éviter le portail mobile/interstitiels

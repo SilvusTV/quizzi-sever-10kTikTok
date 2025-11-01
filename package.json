@@ -14,7 +14,8 @@
     "ws": "^8.18.0",
     "puppeteer": "21.3.8",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

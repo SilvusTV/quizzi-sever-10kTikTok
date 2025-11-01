@@ -18,6 +18,9 @@
  * - Integrate with OBS docks and localStorage in your front-end; this server simply routes messages.
  */
 
+// Load environment variables from .env if present
+import 'dotenv/config';
+
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import type { RawData } from "ws";
