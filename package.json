@@ -15,11 +15,11 @@
     "puppeteer": "21.3.8",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "@types/ws": "^8.18.1"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
-    "@types/ws": "^8.18.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.0",
     "typescript": "^5.4.0"
