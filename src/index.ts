@@ -28,6 +28,7 @@ import { parse as parseUrl } from "url";
 import { ClientToServer, ServerToClient, HttpJson } from "./types";
 
 const PORT = Number(process.env.PORT || 4000);
+const TV_ID = (process.env.TV_ID || "tv").trim().toLowerCase();
 
 // Registry of connected clients: id -> WebSocket
 const clients = new Map<string, WebSocket>();
@@ -282,6 +283,51 @@ function onClientMessage(id: string, ws: WebSocket, data: RawData) {
 
   // TODO: Place your custom message handling here when not routing to a specific client.
   // Example: handle commands like "countdown:start" globally, or store values for OBS docks, etc.
+
+  // Handle TikTok scrape command and respond via WebSocket to TV client
+  if ((msg as any).type === "tiktok:scrape") {
+    const username = String((msg as any).payload?.username ?? "freekadelle_").trim();
+
+    // Immediate ACK to requester that job started
+    try {
+      ws.send(JSON.stringify({ from: "server", type: "ack", payload: { started: true, cmd: "tiktok:scrape", username }, ts: Date.now() }));
+    } catch {}
+
+    (async () => {
+      const startedAt = Date.now();
+      try {
+        // Dynamically require the JS scraper to avoid TS build path issues
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const TikTok = require("../tiktok_scrapper");
+        const result: any = await (TikTok as any).scrapeTikTokStats(username);
+        const followers = result?.profile?.followers ?? null;
+
+        // Send to TV client
+        const deliveredToTv = sendTo(TV_ID, { type: "tiktok:followers", payload: { username, followers, ts: Date.now(), durationMs: Date.now() - startedAt } });
+
+        // Notify requester about completion
+        try {
+          ws.send(JSON.stringify({ from: "server", type: "tiktok:scrape:done", payload: { username, followers, deliveredToTv }, ts: Date.now() }));
+        } catch {}
+
+        if (!deliveredToTv) {
+          // If TV is not connected, inform requester explicitly
+          try {
+            ws.send(JSON.stringify({ from: "server", type: "warn", payload: { message: `TV client '${TV_ID}' not connected`, username }, ts: Date.now() }));
+          } catch {}
+        }
+      } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        // Error to requester
+        try {
+          ws.send(JSON.stringify({ from: "server", type: "tiktok:scrape:error", payload: { username, message }, ts: Date.now() }));
+        } catch {}
+        // Forward error to TV as well
+        sendTo(TV_ID, { type: "tiktok:followers:error", payload: { username, message } });
+      }
+    })();
+    return;
+  }
 
   // For now, echo back
   ws.send(JSON.stringify({ from: "server", type: "echo", payload: msg, ts: Date.now() }));
