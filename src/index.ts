@@ -173,11 +173,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET /tiktok/don/1, /tiktok/don/2, /tiktok/don/5 -> broadcast donation event to all websocket clients
-  if (req.method === "GET" && (pathname === "/tiktok/don/1" || pathname === "/tiktok/don/2" || pathname === "/tiktok/don/5")) {
-    const amount = Number(pathname!.split("/").pop());
-    const delivered = broadcast({ type: "tiktok:don", payload: { amount, via: "http" } });
-    return sendJson(res, { status: "ok", message: `tiktok:don (${amount}) to ${delivered} client(s)`, data: { amount, delivered } });
+  // POST /tiktok/don -> broadcast donation event to all websocket clients with amount and message
+  if (req.method === "POST" && pathname === "/tiktok/don") {
+    let raw = "";
+    req.on("data", (chunk) => (raw += chunk));
+    req.on("end", () => {
+      try {
+        const parsed = raw ? JSON.parse(raw) : {};
+        const amount = Number((parsed as any).amount);
+        const message = typeof (parsed as any).message === "string" ? (parsed as any).message : undefined;
+        if (!Number.isFinite(amount) || message === undefined) {
+          return sendJson(res, { status: "error", message: "Invalid body: expected { amount:number, message:string }" }, 400);
+        }
+        const delivered = broadcast({ type: "tiktok:don", payload: { amount, message, via: "http" } });
+        return sendJson(res, { status: "ok", message: `tiktok:don (${amount}) to ${delivered} client(s)`, data: { amount, message, delivered } });
+      } catch (err) {
+        return sendJson(res, { status: "error", message: (err as Error).message }, 400);
+      }
+    });
+    return;
   }
 
   return notFound(res);
